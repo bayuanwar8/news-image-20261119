@@ -14,7 +14,7 @@
 // and a hand-written PNG encoder (IHDR/IDAT/IEND, zlib deflate).
 // All text is English. All facts are from reporting of 19 Nov 2026.
 
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 
 // ---------------------------------------------------------------- canvas
@@ -224,100 +224,431 @@ function encodePNG() {
   ]);
 }
 
-// ---------------------------------------------------------------- font
-// Hand-defined 5x7 pixel font. Each glyph is 7 rows of 5 characters.
-// '#' = ink, '.' = empty. Readable when scaled 2x and up.
-const FONT = {
-  "A": [".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],
-  "B": ["####.", "#...#", "#...#", "####.", "#...#", "#...#", "####."],
-  "C": [".####", "#....", "#....", "#....", "#....", "#....", ".####"],
-  "D": ["####.", "#...#", "#...#", "#...#", "#...#", "#...#", "####."],
-  "E": ["#####", "#....", "#....", "####.", "#....", "#....", "#####"],
-  "F": ["#####", "#....", "#....", "####.", "#....", "#....", "#...."],
-  "G": [".####", "#....", "#....", "#.###", "#...#", "#...#", ".###."],
-  "H": ["#...#", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],
-  "I": [".###.", "..#..", "..#..", "..#..", "..#..", "..#..", ".###."],
-  "J": ["..###", "...#.", "...#.", "...#.", "...#.", "#..#.", ".##.."],
-  "K": ["#...#", "#..#.", "#.#..", "##...", "#.#..", "#..#.", "#...#"],
-  "L": ["#....", "#....", "#....", "#....", "#....", "#....", "#####"],
-  "M": ["#...#", "##.##", "#.#.#", "#.#.#", "#...#", "#...#", "#...#"],
-  "N": ["#...#", "##..#", "##..#", "#.#.#", "#..##", "#..##", "#...#"],
-  "O": [".###.", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."],
-  "P": ["####.", "#...#", "#...#", "####.", "#....", "#....", "#...."],
-  "Q": [".###.", "#...#", "#...#", "#...#", "#.#.#", "#..#.", ".##.#"],
-  "R": ["####.", "#...#", "#...#", "####.", "#.#..", "#..#.", "#...#"],
-  "S": [".####", "#....", "#....", ".###.", "....#", "....#", "####."],
-  "T": ["#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#.."],
-  "U": ["#...#", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."],
-  "V": ["#...#", "#...#", "#...#", "#...#", "#...#", ".#.#.", "..#.."],
-  "W": ["#...#", "#...#", "#...#", "#.#.#", "#.#.#", "##.##", "#...#"],
-  "X": ["#...#", "#...#", ".#.#.", "..#..", ".#.#.", "#...#", "#...#"],
-  "Y": ["#...#", "#...#", ".#.#.", "..#..", "..#..", "..#..", "..#.."],
-  "Z": ["#####", "....#", "...#.", "..#..", ".#...", "#....", "#####"],
-  "0": [".###.", "#...#", "#..##", "#.#.#", "##..#", "#...#", ".###."],
-  "1": ["..#..", ".##..", "..#..", "..#..", "..#..", "..#..", ".###."],
-  "2": [".###.", "#...#", "....#", "...#.", "..#..", ".#...", "#####"],
-  "3": ["####.", "....#", "....#", ".###.", "....#", "....#", "####."],
-  "4": ["...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#."],
-  "5": ["#####", "#....", "####.", "....#", "....#", "#...#", ".###."],
-  "6": [".###.", "#....", "#....", "####.", "#...#", "#...#", ".###."],
-  "7": ["#####", "....#", "...#.", "...#.", "..#..", "..#..", "..#.."],
-  "8": [".###.", "#...#", "#...#", ".###.", "#...#", "#...#", ".###."],
-  "9": [".###.", "#...#", "#...#", ".####", "....#", "....#", ".###."],
-  "a": [".....", ".....", ".###.", "....#", ".####", "#...#", ".####"],
-  "b": ["#....", "#....", "####.", "#...#", "#...#", "#...#", "####."],
-  "c": [".....", ".....", ".####", "#....", "#....", "#....", ".####"],
-  "d": ["....#", "....#", ".####", "#...#", "#...#", "#...#", ".####"],
-  "e": [".....", ".....", ".###.", "#...#", "#####", "#....", ".###."],
-  "f": ["..##.", ".#..#", ".#...", "###..", ".#...", ".#...", ".#..."],
-  "g": [".....", ".####", "#...#", "#...#", ".####", "....#", ".###."],
-  "h": ["#....", "#....", "####.", "#...#", "#...#", "#...#", "#...#"],
-  "i": ["..#..", ".....", ".##..", "..#..", "..#..", "..#..", ".###."],
-  "j": ["...#.", ".....", "..##.", "...#.", "...#.", "...#.", ".##.."],
-  "k": ["#....", "#....", "#..#.", "#.#..", "##...", "#.#..", "#..#."],
-  "l": [".##..", "..#..", "..#..", "..#..", "..#..", "..#..", ".###."],
-  "m": [".....", ".....", "##.#.", "#.#.#", "#.#.#", "#.#.#", "#.#.#"],
-  "n": [".....", ".....", "####.", "#...#", "#...#", "#...#", "#...#"],
-  "o": [".....", ".....", ".###.", "#...#", "#...#", "#...#", ".###."],
-  "p": [".....", ".....", "####.", "#...#", "#...#", "####.", "#...."],
-  "q": [".....", ".....", ".####", "#...#", "#...#", ".####", "....#"],
-  "r": [".....", ".....", "#.##.", "##..#", "#....", "#....", "#...."],
-  "s": [".....", ".....", ".####", "#....", ".###.", "....#", "####."],
-  "t": [".#...", ".#...", "###..", ".#...", ".#...", ".#...", "..##."],
-  "u": [".....", ".....", "#...#", "#...#", "#...#", "#..##", ".##.#"],
-  "v": [".....", ".....", "#...#", "#...#", "#...#", ".#.#.", "..#.."],
-  "w": [".....", ".....", "#...#", "#.#.#", "#.#.#", "#.#.#", ".#.#."],
-  "x": [".....", ".....", "#...#", ".#.#.", "..#..", ".#.#.", "#...#"],
-  "y": [".....", ".....", "#...#", "#...#", ".####", "....#", ".###."],
-  "z": [".....", ".....", "#####", "....#", "...#.", "..#..", "#####"],
-  " ": [".....", ".....", ".....", ".....", ".....", ".....", "....."],
-  ".": [".....", ".....", ".....", ".....", ".....", ".##..", ".##.."],
-  ",": [".....", ".....", ".....", ".....", ".##..", ".##..", ".#..."],
-  ":": [".....", ".##..", ".##..", ".....", ".##..", ".##..", "....."],
-  ";": [".....", ".##..", ".##..", ".....", ".##..", ".##..", ".#..."],
-  "'": ["..#..", "..#..", "..#..", ".....", ".....", ".....", "....."],
-  '"': [".#.#.", ".#.#.", ".#.#.", ".....", ".....", ".....", "....."],
-  "-": [".....", ".....", ".....", ".###.", ".....", ".....", "....."],
-  "—": [".....", ".....", ".....", "#####", ".....", ".....", "....."],
-  "(": ["...##", "..#..", ".#...", ".#...", ".#...", "..#..", "...##"],
-  ")": ["##...", "..#..", "...#.", "...#.", "...#.", "..#..", "##..."],
-  "/": ["....#", "....#", "...#.", "..#..", ".#...", "#....", "#...."],
-  "%": ["##...", "##...", "..#..", ".#...", "#....", "...##", "...##"],
-  "$": ["..#..", ".####", "#.#..", ".###.", "..#.#", "####.", "..#.."],
-  "&": [".##..", "#..#.", "#..#.", ".#...", "#.#.#", "#..#.", ".##.#"],
-  "!": ["..#..", "..#..", "..#..", "..#..", "..#..", ".....", "..#.."],
-  "?": [".###.", "#...#", "....#", "...#.", "..#..", ".....", "..#.."],
-  "+": [".....", "..#..", "..#..", ".###.", "..#..", "..#..", "....."],
-  "=": [".....", ".....", ".###.", ".....", ".###.", ".....", "....."],
-  "@": [".###.", "#...#", "#.###", "#.#.#", "#.##.", "#....", ".###."],
-  "#": [".#.#.", ".#.#.", "#####", ".#.#.", "#####", ".#.#.", ".#.#."],
-  "*": [".....", ".#.#.", ".###.", "#####", ".###.", ".#.#.", "....."],
-  "·": [".....", ".....", ".....", ".##..", ".##..", ".....", "....."],
-  "€": [".####", "#....", "#....", "###..", "#....", "#....", ".####"],
-  "£": ["..##.", ".#...", "#....", "###..", "#....", "#....", "####."],
-};
+// ---------------------------------------------------------------- font (TrueType)
+// Real TrueType fonts (DejaVu, SIL OFL) shipped in fonts/. A pure-stdlib
+// TTF reader + glyph rasterizer: cmap format 4 and 12, glyf/loca outlines
+// (quadratic Beziers, composite glyphs), scanline fill with 4x
+// supersampling anti-aliasing, so the type looks like a real newspaper.
+// All text is English. Deterministic: no Date, no Math.random.
 
-// Normalize curly quotes/dashes to the glyphs we have.
+const SS = 4; // supersample factor for anti-aliasing
+
+function parseTTF(buf) {
+  const u16 = (o) => buf.readUInt16BE(o);
+  const i16 = (o) => buf.readInt16BE(o);
+  const u32 = (o) => buf.readUInt32BE(o);
+  const numTables = u16(4);
+  const tabs = {};
+  for (let i = 0; i < numTables; i++) {
+    const o = 12 + i * 16;
+    tabs[buf.toString("ascii", o, o + 4)] = { off: u32(o + 8), len: u32(o + 12) };
+  }
+  const head = tabs.head.off;
+  const unitsPerEm = u16(head + 18);
+  const indexToLocFormat = i16(head + 50);
+  const numGlyphs = u16(tabs.maxp.off + 4);
+  const hhea = tabs.hhea.off;
+  const numberOfHMetrics = u16(hhea + 34);
+  const ascent = i16(hhea + 4);
+  const descent = i16(hhea + 6);
+  // hmtx advances (last metric repeats for the remaining glyphs).
+  const hmtx = tabs.hmtx.off;
+  const advances = new Uint16Array(numGlyphs);
+  for (let g = 0; g < numGlyphs; g++) {
+    advances[g] = u16(hmtx + Math.min(g, numberOfHMetrics - 1) * 4);
+  }
+  // loca: glyph offsets.
+  const loca = tabs.loca.off;
+  const glyphOff = (g) => (indexToLocFormat === 1 ? u32(loca + g * 4) : u16(loca + g * 2) * 2);
+  // cmap: prefer format 12, else format 4.
+  const cmap = tabs.cmap.off;
+  const nSub = u16(cmap + 2);
+  let cmap12 = -1;
+  let cmap4 = -1;
+  for (let i = 0; i < nSub; i++) {
+    const o = cmap + 4 + i * 8;
+    const subOff = cmap + u32(o + 4);
+    const fmt = u16(subOff);
+    if (fmt === 12 && cmap12 < 0) cmap12 = subOff;
+    if (fmt === 4 && cmap4 < 0) cmap4 = subOff;
+  }
+  const charToGlyph = new Map();
+  if (cmap12 >= 0) {
+    const nGroups = u32(cmap12 + 12);
+    for (let i = 0; i < nGroups; i++) {
+      const o = cmap12 + 16 + i * 12;
+      const start = u32(o);
+      const end = u32(o + 4);
+      const g0 = u32(o + 8);
+      for (let cp = start; cp <= end; cp++) charToGlyph.set(cp, g0 + (cp - start));
+    }
+  } else if (cmap4 >= 0) {
+    const segCount = u16(cmap4 + 6) / 2;
+    const endCodes = cmap4 + 14;
+    const startCodes = endCodes + 2 * segCount + 2;
+    const idDeltas = startCodes + 2 * segCount;
+    const idRangeOffsets = idDeltas + 2 * segCount;
+    for (let s = 0; s < segCount; s++) {
+      const end = u16(endCodes + 2 * s);
+      const start = u16(startCodes + 2 * s);
+      if (end === 0xffff) break;
+      const delta = i16(idDeltas + 2 * s);
+      const rangeOff = u16(idRangeOffsets + 2 * s);
+      for (let cp = start; cp <= end; cp++) {
+        let g;
+        if (rangeOff === 0) {
+          g = (cp + delta) & 0xffff;
+        } else {
+          const idxOff = idRangeOffsets + 2 * s + rangeOff + 2 * (cp - start);
+          g = u16(idxOff);
+          if (g !== 0) g = (g + delta) & 0xffff;
+        }
+        if (g !== 0) charToGlyph.set(cp, g);
+      }
+    }
+  }
+  // glyf outlines. Returns contours as arrays of {x, y, on} points.
+  const glyf = tabs.glyf.off;
+  function glyphContours(g, depth) {
+    if (g >= numGlyphs || depth > 4) return [];
+    const g0 = glyphOff(g);
+    const g1 = glyphOff(g + 1);
+    if (g1 <= g0) return [];
+    const nContours = i16(glyf + g0);
+    if (nContours < 0) {
+      // Composite glyph: components with offsets and optional scales.
+      let p = glyf + g0 + 10;
+      const out = [];
+      for (;;) {
+        const flags = u16(p);
+        p += 2;
+        const compGlyph = u16(p);
+        p += 2;
+        let dx = 0;
+        let dy = 0;
+        let sx = 1;
+        let sy = 1;
+        let s01 = 0;
+        let s10 = 0;
+        if (flags & 0x0001) {
+          dx = i16(p);
+          dy = i16(p + 2);
+          p += 4;
+        } else {
+          // Args are point numbers, not offsets; treat as no offset.
+          p += 2;
+        }
+        if (flags & 0x0008) {
+          sx = sy = i16(p) / 16384;
+          p += 2;
+        } else if (flags & 0x0040) {
+          sx = i16(p) / 16384;
+          sy = i16(p + 2) / 16384;
+          p += 4;
+        } else if (flags & 0x0080) {
+          sx = i16(p) / 16384;
+          s01 = i16(p + 2) / 16384;
+          s10 = i16(p + 4) / 16384;
+          sy = i16(p + 6) / 16384;
+          p += 8;
+        }
+        const sub = glyphContours(compGlyph, depth + 1);
+        for (const contour of sub) {
+          out.push(
+            contour.map((pt) => ({
+              x: dx + pt.x * sx + pt.y * s10,
+              y: dy + pt.x * s01 + pt.y * sy,
+              on: pt.on,
+            }))
+          );
+        }
+        if (!(flags & 0x0020)) break;
+      }
+      return out;
+    }
+    if (nContours === 0) return [];
+    let p = glyf + g0 + 10;
+    const endPts = [];
+    for (let c = 0; c < nContours; c++) {
+      endPts.push(u16(p));
+      p += 2;
+    }
+    const instrLen = u16(p);
+    p += 2 + instrLen;
+    const nPts = endPts[nContours - 1] + 1;
+    const flagsArr = [];
+    while (flagsArr.length < nPts) {
+      const f = buf[p++];
+      flagsArr.push(f);
+      if (f & 0x08) {
+        const rep = buf[p++];
+        for (let r = 0; r < rep; r++) flagsArr.push(f);
+      }
+    }
+    const xs = [];
+    let x = 0;
+    for (let i = 0; i < nPts; i++) {
+      const f = flagsArr[i];
+      if (f & 0x02) {
+        const d = buf[p++];
+        x += f & 0x10 ? d : -d;
+      } else if (!(f & 0x10)) {
+        x += i16(p);
+        p += 2;
+      }
+      xs.push(x);
+    }
+    const ys = [];
+    let y = 0;
+    for (let i = 0; i < nPts; i++) {
+      const f = flagsArr[i];
+      if (f & 0x04) {
+        const d = buf[p++];
+        y += f & 0x20 ? d : -d;
+      } else if (!(f & 0x20)) {
+        y += i16(p);
+        p += 2;
+      }
+      ys.push(y);
+    }
+    const contours = [];
+    let start = 0;
+    for (let c = 0; c < nContours; c++) {
+      const end = endPts[c];
+      const pts = [];
+      for (let i = start; i <= end; i++) {
+        pts.push({ x: xs[i], y: ys[i], on: (flagsArr[i] & 0x01) !== 0 });
+      }
+      contours.push(pts);
+      start = end + 1;
+    }
+    return contours;
+  }
+  // Glyph bounding box from the glyf header (xMin, yMin, xMax, yMax).
+  function glyphBox(g) {
+    if (g >= numGlyphs) return null;
+    const g0 = glyphOff(g);
+    const g1 = glyphOff(g + 1);
+    if (g1 <= g0) return null;
+    return {
+      xMin: i16(glyf + g0 + 2),
+      yMin: i16(glyf + g0 + 4),
+      xMax: i16(glyf + g0 + 6),
+      yMax: i16(glyf + g0 + 8),
+    };
+  }
+  return { unitsPerEm, numGlyphs, ascent, descent, advances, charToGlyph, glyphContours, glyphBox };
+}
+
+// Flatten one contour ({x, y, on} points) into a polygon of [x, y] points.
+// Handles off-curve start/end points and implied on-curve midpoints.
+function flattenContour(pts) {
+  const n = pts.length;
+  if (n === 0) return [];
+  if (n === 1) return [[pts[0].x, pts[0].y]];
+  let items = [];
+  let start = -1;
+  for (let i = 0; i < n; i++) {
+    if (pts[i].on) {
+      start = i;
+      break;
+    }
+  }
+  if (start === -1) {
+    // All points off-curve: implied on-curve points between each pair.
+    for (let i = 0; i < n; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % n];
+      items.push({ on: false, x: a.x, y: a.y });
+      items.push({ on: true, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+    }
+    items = items.slice(1).concat(items.slice(0, 1));
+  } else {
+    for (let k = 0; k < n; k++) items.push(pts[(start + k) % n]);
+    const expanded = [];
+    for (let i = 0; i < items.length; i++) {
+      expanded.push(items[i]);
+      const nxt = items[(i + 1) % items.length];
+      if (!items[i].on && !nxt.on) {
+        expanded.push({ on: true, x: (items[i].x + nxt.x) / 2, y: (items[i].y + nxt.y) / 2 });
+      }
+    }
+    items = expanded;
+  }
+  const poly = [[items[0].x, items[0].y]];
+  let cx = items[0].x;
+  let cy = items[0].y;
+  let i = 1;
+  while (i < items.length) {
+    const it = items[i];
+    if (it.on) {
+      poly.push([it.x, it.y]);
+      cx = it.x;
+      cy = it.y;
+      i++;
+    } else {
+      const end = items[(i + 1) % items.length];
+      const segs = quadSegments(cx, cy, it.x, it.y, end.x, end.y);
+      for (const p of segs) poly.push(p);
+      cx = end.x;
+      cy = end.y;
+      i += 2;
+    }
+  }
+  return poly;
+}
+
+// Subdivide a quadratic Bezier into line segments (excluding the start
+// point, including the end point). Deterministic adaptive subdivision.
+function quadSegments(x0, y0, cx, cy, x1, y1) {
+  const pts = [];
+  function sub(ax, ay, bx, by, ex, ey, depth) {
+    const mx = (ax + 2 * bx + ex) / 4;
+    const my = (ay + 2 * by + ey) / 4;
+    const lx = (ax + ex) / 2;
+    const ly = (ay + ey) / 2;
+    const d = Math.abs(mx - lx) + Math.abs(my - ly);
+    if (d < 0.5 || depth >= 10) {
+      pts.push([ex, ey]);
+      return;
+    }
+    const abx = (ax + bx) / 2;
+    const aby = (ay + by) / 2;
+    const bcx = (bx + ex) / 2;
+    const bcy = (by + ey) / 2;
+    const mxx = (abx + bcx) / 2;
+    const myy = (aby + bcy) / 2;
+    sub(ax, ay, abx, aby, mxx, myy, depth + 1);
+    sub(mxx, myy, bcx, bcy, ex, ey, depth + 1);
+  }
+  sub(x0, y0, cx, cy, x1, y1, 0);
+  return pts;
+}
+
+// Scanline fill of polygons with the non-zero winding rule.
+// Returns a Uint8Array of 0/1 coverage at W x H.
+function fillPolygons(polys, W, H) {
+  const cov = new Uint8Array(W * H);
+  const edges = [];
+  for (const poly of polys) {
+    for (let i = 0; i < poly.length; i++) {
+      const x0 = poly[i][0];
+      const y0 = poly[i][1];
+      const x1 = poly[(i + 1) % poly.length][0];
+      const y1 = poly[(i + 1) % poly.length][1];
+      if (y0 === y1) continue;
+      edges.push({ x0, y0, x1, y1 });
+    }
+  }
+  for (let y = 0; y < H; y++) {
+    const yc = y + 0.5;
+    const crossings = [];
+    for (const e of edges) {
+      if ((e.y0 <= yc && e.y1 > yc) || (e.y1 <= yc && e.y0 > yc)) {
+        const t = (yc - e.y0) / (e.y1 - e.y0);
+        crossings.push({ x: e.x0 + t * (e.x1 - e.x0), dir: e.y1 > e.y0 ? 1 : -1 });
+      }
+    }
+    crossings.sort((a, b) => a.x - b.x);
+    let winding = 0;
+    let startX = null;
+    for (const c of crossings) {
+      if (winding === 0) startX = c.x;
+      winding += c.dir;
+      if (winding === 0 && startX !== null) {
+        const x0 = Math.max(0, Math.ceil(startX - 0.5));
+        const x1 = Math.min(W, Math.floor(c.x + 0.5));
+        for (let x = x0; x < x1; x++) cov[y * W + x] = 1;
+        startX = null;
+      }
+    }
+  }
+  return cov;
+}
+
+// Rasterize one glyph at a pixel size into a grayscale bitmap.
+// Returns { w, h, xOff, yOff, advance, bitmap }; xOff/yOff is the
+// bitmap's top-left relative to the pen position (baseline origin).
+function rasterizeGlyph(font, g, size) {
+  const scale = size / font.unitsPerEm;
+  const adv = font.advances[g] * scale;
+  const box = font.glyphBox(g);
+  if (!box) return { w: 0, h: 0, xOff: 0, yOff: 0, advance: adv, bitmap: null };
+  const pad = 1;
+  const x0 = Math.floor(box.xMin * scale) - pad;
+  const x1 = Math.ceil(box.xMax * scale) + pad;
+  const y0 = Math.floor(-box.yMax * scale) - pad;
+  const y1 = Math.ceil(-box.yMin * scale) + pad;
+  const w = x1 - x0;
+  const h = y1 - y0;
+  if (w <= 0 || h <= 0) return { w: 0, h: 0, xOff: 0, yOff: 0, advance: adv, bitmap: null };
+  const s = SS;
+  const W = w * s;
+  const H = h * s;
+  const contours = font.glyphContours(g, 0);
+  const polys = [];
+  for (const contour of contours) {
+    const scaled = contour.map((pt) => ({
+      x: (pt.x * scale - x0) * s,
+      y: (-pt.y * scale - y0) * s,
+      on: pt.on,
+    }));
+    const poly = flattenContour(scaled);
+    if (poly.length >= 3) polys.push(poly);
+  }
+  const cov = fillPolygons(polys, W, H);
+  const bitmap = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let sum = 0;
+      for (let sy = 0; sy < s; sy++) {
+        for (let sx = 0; sx < s; sx++) sum += cov[(y * s + sy) * W + (x * s + sx)];
+      }
+      bitmap[y * w + x] = Math.round((sum / (s * s)) * 255);
+    }
+  }
+  return { w, h, xOff: x0, yOff: y0, advance: adv, bitmap };
+}
+
+// Composite a rasterized glyph bitmap onto the framebuffer with blending.
+function drawGlyphBitmap(g, penX, baselineY, color) {
+  const x0 = Math.round(penX) + g.xOff;
+  const y0 = Math.round(baselineY) + g.yOff;
+  for (let y = 0; y < g.h; y++) {
+    const yy = y0 + y;
+    if (yy < 0 || yy >= H) continue;
+    for (let x = 0; x < g.w; x++) {
+      const c = g.bitmap[y * g.w + x];
+      if (c === 0) continue;
+      const xx = x0 + x;
+      if (xx < 0 || xx >= W) continue;
+      const i = (yy * W + xx) * 3;
+      if (c === 255) {
+        px[i] = color[0];
+        px[i + 1] = color[1];
+        px[i + 2] = color[2];
+      } else {
+        const inv = 255 - c;
+        px[i] = ((px[i] * inv + color[0] * c + 127) / 255) | 0;
+        px[i + 1] = ((px[i + 1] * inv + color[1] * c + 127) / 255) | 0;
+        px[i + 2] = ((px[i + 2] * inv + color[2] * c + 127) / 255) | 0;
+      }
+    }
+  }
+}
+
+// Load the fonts (relative to this script; the repo is read-only /bot
+// in the sandbox, and the fonts ship inside it).
+function loadFont(rel) {
+  const f = parseTTF(readFileSync(new URL(rel, import.meta.url)));
+  f.rasterCache = new Map();
+  return f;
+}
+const FONT_SERIF_B = loadFont("fonts/DejaVuSerif-Bold.ttf");
+const FONT_SANS = loadFont("fonts/DejaVuSans.ttf");
+const FONT_SANS_B = loadFont("fonts/DejaVuSans-Bold.ttf");
+
+// Normalize curly quotes/dashes to the glyphs we use.
 function normChar(ch) {
   if (ch === "’" || ch === "‘" || ch === "`") return "'";
   if (ch === "“" || ch === "”") return '"';
@@ -325,65 +656,82 @@ function normChar(ch) {
   return ch;
 }
 
-const CHAR_ADV = 6; // 5px glyph + 1px gap, times scale
+function glyphFor(font, ch) {
+  const cp = normChar(ch).codePointAt(0);
+  const g = font.charToGlyph.get(cp);
+  return g === undefined ? 0 : g; // 0 = .notdef
+}
 
-function drawChar(x, y, ch, scale, color) {
-  const g = FONT[normChar(ch)] || FONT["?"];
-  for (let r = 0; r < 7; r++) {
-    const row = g[r];
-    for (let c = 0; c < 5; c++) {
-      if (row[c] === "#") fillRect(x + c * scale, y + r * scale, scale, scale, color);
-    }
+function getGlyph(font, size, g) {
+  const key = size + ":" + g;
+  let r = font.rasterCache.get(key);
+  if (!r) {
+    r = rasterizeGlyph(font, g, size);
+    font.rasterCache.set(key, r);
   }
+  return r;
 }
 
-function textWidth(s, scale) {
-  return s.length * CHAR_ADV * scale;
+// Width of a string in pixels at a font size.
+function textWidth(font, size, s) {
+  let w = 0;
+  for (const ch of s) w += font.advances[glyphFor(font, ch)] * (size / font.unitsPerEm);
+  return w;
 }
 
-// Draw one line of text (no wrap). Returns width used.
-function drawText(x, y, s, scale, color) {
-  let cx = x;
+// Draw one line of text. x, y = top-left of the em box (y is the top of
+// the ascender). Returns the width used.
+function drawText(x, y, s, font, size, color) {
+  const scale = size / font.unitsPerEm;
+  const baseline = y + font.ascent * scale;
+  let penX = x;
   for (const ch of s) {
-    drawChar(cx, y, ch, scale, color);
-    cx += CHAR_ADV * scale;
+    const g = glyphFor(font, ch);
+    const r = getGlyph(font, size, g);
+    if (r.bitmap) drawGlyphBitmap(r, penX, baseline, color);
+    penX += r.advance;
   }
-  return cx - x;
+  return penX - x;
 }
 
-function drawTextCentered(cx, y, s, scale, color) {
-  const w = textWidth(s, scale);
-  return drawText(cx - Math.floor(w / 2), y, s, scale, color);
+function drawTextCentered(cx, y, s, font, size, color) {
+  const w = textWidth(font, size, s);
+  return drawText(cx - w / 2, y, s, font, size, color);
 }
 
-// Word-wrap text into lines that fit maxW. Returns array of lines.
-function wrapText(s, maxW, scale) {
-  const maxChars = Math.max(1, Math.floor(maxW / (CHAR_ADV * scale)));
+// Word-wrap text into lines that fit maxW (measured, not counted).
+// Returns an array of lines.
+function wrapText(s, maxW, font, size) {
   const words = s.split(" ");
+  const spaceW = textWidth(font, size, " ");
   const lines = [];
   let cur = "";
+  let curW = 0;
   for (const w of words) {
+    const ww = textWidth(font, size, w);
     if (cur === "") {
       cur = w;
-    } else if (cur.length + 1 + w.length <= maxChars) {
+      curW = ww;
+    } else if (curW + spaceW + ww <= maxW) {
       cur += " " + w;
+      curW += spaceW + ww;
     } else {
       lines.push(cur);
       cur = w;
+      curW = ww;
     }
   }
   if (cur !== "") lines.push(cur);
   return lines;
 }
 
-// Draw wrapped text. Returns total height used.
-function drawWrapped(x, y, maxW, s, scale, color, leading) {
-  const lh = 7 * scale + (leading === undefined ? 2 : leading);
-  const lines = wrapText(s, maxW, scale);
-  for (let i = 0; i < lines.length; i++) drawText(x, y + i * lh, lines[i], scale, color);
+// Draw wrapped text. Returns the total height used.
+function drawWrapped(x, y, maxW, s, font, size, color, leading) {
+  const lh = leading === undefined ? Math.round(size * 1.25) : leading;
+  const lines = wrapText(s, maxW, font, size);
+  for (let i = 0; i < lines.length; i++) drawText(x, y + i * lh, lines[i], font, size, color);
   return lines.length * lh;
 }
-
 // ---------------------------------------------------------------- illustrations
 // All drawn from simple shapes. No external images, no network.
 
@@ -444,9 +792,9 @@ function drawChartPanel(x, y, w, h) {
     [x + 270, y + h - 56], [x + w - 8, y + 14],
   ];
   for (let i = 0; i < pts.length - 1; i++) line2(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], [255, 209, 102]);
-  drawText(x + 10, y + 8, "ANT", 2, WHITE);
-  drawText(x + w - 62, y + 8, "$83", 2, [255, 209, 102]);
-  drawText(x + 10, y + h - 18, "NASDAQ · FIRST TRADES TODAY", 1, [180, 220, 190]);
+  drawText(x + 10, y + 8, "ANT", FONT_SANS_B, 16, WHITE);
+  drawText(x + w - 10 - textWidth(FONT_SANS_B, 16, "$83"), y + 8, "$83", FONT_SANS_B, 16, [255, 209, 102]);
+  drawText(x + 10, y + h - 18, "NASDAQ · FIRST TRADES TODAY", FONT_SANS, 10, [180, 220, 190]);
 }
 
 // --- courthouse panel ---
@@ -496,7 +844,7 @@ function drawSummitPanel(x, y, w, h) {
   flagUS(spots[0] + 4, fy, fw, fh);
   flagCN(spots[1] + 4, fy, fw, fh);
   flagRU(spots[2] + 4, fy, fw, fh);
-  drawText(x + 10, y + h - 26, "SHENZHEN", 1, WHITE);
+  drawText(x + 10, y + h - 26, "SHENZHEN", FONT_SANS_B, 11, WHITE);
 }
 
 // --- world map ---
@@ -541,7 +889,7 @@ function drawMap(x, y, cell) {
     const rad = label.length > 1 ? 7 : 6;
     circle(dx, dy, rad, RED);
     circleOutline(dx, dy, rad, WHITE);
-    drawText(dx - Math.floor(textWidth(label, 1) / 2), dy - 4, label, 1, WHITE);
+    drawText(dx - textWidth(FONT_SANS_B, 9, label) / 2, dy - 5, label, FONT_SANS_B, 9, WHITE);
   }
 }
 
@@ -638,25 +986,26 @@ function iconEU(x, y, w, h) {
 
 // ---------------------------------------------------------------- layout
 // 1024x1024 newspaper front page. Content x: 16..1008 (992 wide).
+// All text is English. All facts are from reporting of 19 Nov 2026.
 
 // --- content ---
 const HEROES = [
   {
     kicker: "1 · SHENZHEN · SUMMIT",
     headline: "Trump, Xi and Putin hold first three-way summit",
-    body: "The US, Chinese and Russian leaders meet together for the first time. Ukraine, arms control and the Iran war top the agenda.",
+    body: "The three leaders meet for the first time. Ukraine, arms control and the Iran war top the agenda.",
     draw: drawSummitPanel,
   },
   {
     kicker: "2 · THE HAGUE · LAW",
-    headline: "World Court rules on Myanmar's Rohingya genocide",
-    body: "The UN's highest court rules on Gambia's genocide case against Myanmar over the 2017 campaign. The judgment is final.",
+    headline: "World Court rules on Rohingya genocide",
+    body: "The UN's top court rules on Gambia's genocide case against Myanmar. The judgment is final.",
     draw: drawCourtPanel,
   },
   {
     kicker: "3 · NASDAQ · MARKETS",
     headline: "Anthropic debuts in the biggest IPO on record",
-    body: "Priced at $83, above its $70-78 range; $81.3bn raised, valuing the Claude maker near $1.5tn. First trades Thursday.",
+    body: "Priced at $83, above its $70-78 range; $81.3bn raised, near $1.5tn value.",
     draw: drawChartPanel,
   },
 ];
@@ -664,19 +1013,19 @@ const HEROES = [
 const GRID = [
   {
     kicker: "4 · ANTALYA · CLIMATE",
-    headline: "COP31 enters its final 48 hours",
+    headline: "COP31 enters final 48 hours",
     body: "Ministers take over the text; 'phase out' and the $120bn fund are still open.",
     draw: iconCOP31,
   },
   {
     kicker: "5 · KYIV · WAR",
-    headline: "Ukraine strikes Crimean Bridge again",
+    headline: "Ukraine hits Crimean Bridge",
     body: "A third attack in a week; traffic is suspended after the new strike, Russian officials say.",
     draw: iconBridge,
   },
   {
     kicker: "6 · HORMUZ · ENERGY",
-    headline: "IEA: Mideast crisis threatens energy",
+    headline: "Mideast crisis threatens energy",
     body: "The Middle East crisis is the greatest threat to energy security, the IEA's report says.",
     draw: iconBarrel,
   },
@@ -688,64 +1037,64 @@ const GRID = [
   },
   {
     kicker: "8 · NEW YORK · ARTS",
-    headline: "Van Gogh sells for $190.4m, a record",
+    headline: "Van Gogh sells for $190.4m",
     body: "'Chataigniers en fleurs', painted in 1890, is auctioned at Sotheby's in New York.",
     draw: iconSunflower,
   },
   {
     kicker: "9 · WASHINGTON · IRAN",
-    headline: "Netanyahu presses Trump to strike Iran",
+    headline: "Netanyahu urges Iran strike",
     body: "Netanyahu urges a 4- to 7-day campaign; Trump says Iran seeks chemical and biological arms.",
     draw: iconCapitol,
   },
   {
     kicker: "10 · GAZA · WAR",
-    headline: "Israel crosses the Yellow Line in Gaza",
+    headline: "Israel crosses Yellow Line",
     body: "Israeli forces launch a rare ground operation in central Gaza, beyond the Yellow Line.",
     draw: iconTank,
   },
   {
     kicker: "11 · VIENNA · NUCLEAR",
-    headline: "North Korea expands uranium work",
+    headline: "N. Korea expands uranium work",
     body: "The IAEA reports further expansion at Yongbyon; Seoul's president calls for renewed dialogue.",
     draw: iconAtom,
   },
   {
     kicker: "12 · BRUSSELS · EUROPE",
-    headline: "EU proposes a €45bn loan to Ukraine",
+    headline: "EU proposes €45bn loan to Kyiv",
     body: "The European Commission proposes a new 45 billion euro loan to Kyiv.",
     draw: iconEU,
   },
 ];
 
 const BRIEFS = [
-  "CARACAS — US and Venezuela sign a military cooperation agreement.",
-  "WASHINGTON — IMF chief Georgieva: worldwide inflation has hit 4.7%.",
-  "SHENZHEN — Trump tells APEC the US opposes globalist AI regulation.",
-  "SEOUL — President Lee calls for renewed dialogue with Pyongyang.",
-  "JAKARTA — Indonesia's parliament approves an asset-forfeiture bill.",
-  "SUVA — Fiji declares a national disaster over the El Nino drought.",
-  "LONDON — Save the Children: 589m children lived in conflict zones in 2025.",
-  "MARKETS — CAC -0.85%, DAX -1.19%, FTSE -1.30%, S&P -0.23%.",
-  "KUWAIT CITY — Kuwait repels its first Iranian attack in two months.",
-  "WASHINGTON — US files a new emergency Supreme Court request over Venezuelan TPS.",
-  "KUALA LUMPUR — UNHCR stops registering new asylum-seeker cases in Malaysia.",
-  "MANILA — White House pursues a loan package over $2bn for the Philippines.",
-  "SANA'A — Coalition reports a missile threat towards Riyadh.",
-  "PANAMA CITY — Second arrest over the attack on a journalist's home.",
-  "CAPE CANAVERAL — NASA sets coverage for the Northrop Grumman CRS-25 launch.",
-  "NADI — Cyclone Xavier: winds near the centre reach 100 knots.",
-  "KHASAB — Tanker strike reported in Hormuz; crew safe, UKMTO says.",
-  "JERUSALEM — Israel delays E1 settlement; settler kills woman near Jericho.",
-  "SHENZHEN — APEC opens as leaders gather for the trilateral talks.",
-  "WASHINGTON — New START expiry raises questions over arms limits.",
-  "SHENZHEN — Trump meets Putin and Xi separately before the three-way talks.",
-  "RIYADH — Civil Defence says danger has passed after a new warning.",
+  "CARACAS — US, Venezuela sign military deal.",
+  "WASHINGTON — IMF: global inflation hits 4.7%.",
+  "SHENZHEN — Trump: US opposes global AI rules.",
+  "SEOUL — Lee calls for talks with Pyongyang.",
+  "JAKARTA — Indonesia passes asset-seizure bill.",
+  "SUVA — Fiji declares disaster over drought.",
+  "LONDON — 589m children lived in war zones.",
+  "MARKETS — CAC -0.85, DAX -1.19, FTSE -1.30, S&P -0.23%.",
+  "KUWAIT CITY — Kuwait repels Iranian attack.",
+  "WASHINGTON — US seeks stay on Venezuelan TPS.",
+  "KUALA LUMPUR — UNHCR halts new asylum cases.",
+  "MANILA — US pursues $2bn loan for Philippines.",
+  "SANA'A — Missile threat reported near Riyadh.",
+  "PANAMA CITY — Second arrest in reporter attack.",
+  "CAPE CANAVERAL — NASA sets CRS-25 launch cover.",
+  "NADI — Cyclone Xavier winds hit 100 knots.",
+  "KHASAB — Tanker hit in Hormuz; crew safe.",
+  "JERUSALEM — E1 delayed; settler kills woman.",
+  "SHENZHEN — APEC opens before trilateral talks.",
+  "WASHINGTON — New START expiry raises arms fears.",
+  "SHENZHEN — Trump meets Putin, Xi separately.",
+  "RIYADH — Danger passed after new warning.",
 ];
 
 const STATS = [
   ["$81.3bn", "raised by Anthropic — the largest IPO on record"],
-  ["3", "leaders hold the first three-way summit in Shenzhen"],
+  ["3", "first three-way summit in Shenzhen"],
   ["$120bn", "adaptation-finance goal still open at COP31"],
   ["730,000", "Rohingya who fled in 2017 — the ICJ case"],
   ["$190.4m", "Van Gogh sells for a record at Sotheby's"],
@@ -767,18 +1116,18 @@ rectOutline(8, 8, 1008, 1008, INK);
 hline(10, 10, 1004, INK, 1);
 
 // Masthead
-drawTextCentered(512, 22, "THE WORLD IN ONE DAY", 2, RED);
+drawTextCentered(512, 20, "THE WORLD IN ONE DAY", FONT_SERIF_B, 20, RED);
 {
   const t = "THURSDAY'S NEWS · ONE PAGE · 34 STORIES";
-  drawText(1008 - textWidth(t, 1), 24, t, 1, INK);
+  drawText(1008 - textWidth(FONT_SANS_B, 11, t), 22, t, FONT_SANS_B, 11, INK);
 }
-drawTextCentered(512, 46, "Thursday 19 November 2026", 6, INK);
+drawTextCentered(512, 44, "Thursday 19 November 2026", FONT_SERIF_B, 56, INK);
 drawTextCentered(
-  512, 98,
+  512, 102,
   "Three leaders meet in Shenzhen · A court rules on Myanmar · The biggest IPO ever",
-  2, RED
+  FONT_SERIF_B, 15, RED
 );
-hline(16, 120, 992, INK, 2);
+hline(16, 122, 992, INK, 2);
 
 // Region strip
 {
@@ -786,8 +1135,8 @@ hline(16, 120, 992, INK, 2);
   for (let i = 0; i < REGIONS.length; i++) {
     const x = 16 + Math.floor(i * tabW);
     const w = Math.floor((i + 1) * tabW) - Math.floor(i * tabW);
-    fillRect(x, 126, w, 26, REGIONS[i][1]);
-    drawTextCentered(x + Math.floor(w / 2), 135, REGIONS[i][0], 1, WHITE);
+    fillRect(x, 128, w, 26, REGIONS[i][1]);
+    drawTextCentered(x + Math.floor(w / 2), 135, REGIONS[i][0], FONT_SANS_B, 12, WHITE);
   }
 }
 
@@ -796,65 +1145,67 @@ hline(16, 120, 992, INK, 2);
   const colW = 992 / 6;
   for (let i = 0; i < STATS.length; i++) {
     const x = 16 + Math.floor(i * colW);
-    if (i > 0) vline(x, 164, 62, GREY, 1);
-    drawText(x + 8, 164, STATS[i][0], 3, RED);
-    drawWrapped(x + 8, 192, Math.floor(colW) - 16, STATS[i][1], 1, INK, 1);
+    if (i > 0) vline(x, 164, 56, GREY, 1);
+    drawText(x + 8, 162, STATS[i][0], FONT_SANS_B, 26, RED);
+    drawWrapped(x + 8, 192, Math.floor(colW) - 16, STATS[i][1], FONT_SANS, 10, INK, 13);
   }
 }
-hline(16, 230, 992, INK, 2);
+hline(16, 224, 992, INK, 2);
 
 // Heroes
 for (let i = 0; i < HEROES.length; i++) {
   const x = 16 + i * 328;
   const h = HEROES[i];
-  h.draw(x, 238, 320, 100);
-  drawText(x, 344, h.kicker, 1, RED);
-  drawWrapped(x, 358, 320, h.headline, 3, INK, 2);
-  drawWrapped(x, 431, 320, h.body, 1, INK, 2);
+  h.draw(x, 232, 320, 100);
+  drawText(x, 338, h.kicker, FONT_SANS_B, 11, RED);
+  drawWrapped(x, 354, 320, h.headline, FONT_SERIF_B, 22, INK, 27);
+  drawWrapped(x, 416, 320, h.body, FONT_SANS, 11, INK, 14);
 }
-hline(16, 466, 992, INK, 2);
+hline(16, 452, 992, INK, 2);
 
 // Grid (3 rows x 3 cols)
 for (let i = 0; i < GRID.length; i++) {
   const row = Math.floor(i / 3);
   const col = i % 3;
   const x = 16 + col * 328;
-  const y = 474 + row * 104;
+  const y = 460 + row * 104;
   const g = GRID[i];
   g.draw(x, y, 320, 28);
-  drawText(x, y + 32, g.kicker, 1, RED);
-  drawWrapped(x, y + 44, 320, g.headline, 2, INK, 2);
-  drawWrapped(x, y + 78, 320, g.body, 1, INK, 1);
+  drawText(x, y + 32, g.kicker, FONT_SANS_B, 10, RED);
+  drawWrapped(x, y + 46, 320, g.headline, FONT_SERIF_B, 17, INK, 21);
+  drawWrapped(x, y + 70, 320, g.body, FONT_SANS, 11, INK, 13);
   if (col < 2) vline(x + 324, y, 96, GREY_LT, 1);
 }
-hline(16, 784, 992, INK, 2);
+hline(16, 780, 992, INK, 2);
 
-// Bottom: map (left) + briefs (right)
-drawText(16, 792, "WHERE IT HAPPENED", 2, RED);
-drawMap(16, 810, 6);
-drawText(16, 970, "Red numbers mark stories 1-12.", 1, INK);
-drawText(16, 979, "Positions are approximate.", 1, INK);
+// Bottom: map (left) + briefs (right, two columns)
+drawText(16, 788, "WHERE IT HAPPENED", FONT_SANS_B, 16, RED);
+drawMap(16, 806, 6);
+drawText(16, 966, "Red numbers mark stories 1-12.", FONT_SANS, 10, INK);
+drawText(16, 977, "Positions are approximate.", FONT_SANS, 10, INK);
 
-drawText(360, 792, "ALSO ON THURSDAY 19 NOVEMBER — 22 MORE STORIES", 2, RED);
+drawText(360, 788, "ALSO ON THURSDAY 19 NOVEMBER — 22 MORE STORIES", FONT_SANS_B, 15, RED);
 for (let i = 0; i < BRIEFS.length; i++) {
-  drawText(360, 810 + i * 8, BRIEFS[i], 1, INK);
+  const col = i < 11 ? 0 : 1;
+  const row = i % 11;
+  drawText(360 + col * 326, 810 + row * 13, BRIEFS[i], FONT_SANS, 10, INK);
 }
 
 // Footer
-hline(16, 992, 992, INK, 1);
+hline(16, 988, 992, INK, 1);
 drawTextCentered(
-  512, 996,
+  512, 991,
   "Every story happened, or was first reported, on Thursday 19 November 2026.",
-  1, INK
+  FONT_SANS, 10, INK
 );
 drawTextCentered(
-  512, 1005,
+  512, 1002,
   "Sources: Reuters, AP, AFP, BBC, The Hindu, IMD, NASA, ICJ. Original drawings.",
-  1, INK
+  FONT_SANS, 10, INK
 );
-
 // ---------------------------------------------------------------- write
 const outDir = process.env.MAKEFUN_OUTPUT_DIR || "/output";
 mkdirSync(outDir, { recursive: true });
 const png = encodePNG();
 writeFileSync(outDir + "/entry.png", png);
+

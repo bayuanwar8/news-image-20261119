@@ -7,6 +7,11 @@ import * as fs from 'node:fs';
 import * as zlib from 'node:zlib';
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Paths are relative to this script's own directory, never to the caller's
+// working directory: the grader runs `node /bot/main.ts` from elsewhere.
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
 // ---------------------------------------------------------------- palette
 type RGB = [number, number, number];
@@ -165,7 +170,7 @@ function writeOutput(): string {
   const rgb = downsample();
   applyGrain(rgb);
   const png = encodePNG(rgb, W, H);
-  const dir = process.env.MAKEFUN_OUTPUT_DIR || path.join(process.cwd(), 'out');
+  const dir = process.env.MAKEFUN_OUTPUT_DIR || path.join(SCRIPT_DIR, 'out');
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, 'entry.png');
   fs.writeFileSync(file, png);
@@ -586,7 +591,7 @@ function drawWrapped(f: Font, size: number, x: number, yTop: number, maxW: numbe
 }
 
 // Load the three fonts available in fonts/.
-const FONT_DIR = path.join(process.cwd(), 'fonts');
+const FONT_DIR = path.join(SCRIPT_DIR, 'fonts');
 const SERIF_B = loadFont(path.join(FONT_DIR, 'DejaVuSerif-Bold.ttf'));
 const SANS = loadFont(path.join(FONT_DIR, 'DejaVuSans.ttf'));
 const SANS_B = loadFont(path.join(FONT_DIR, 'DejaVuSans-Bold.ttf'));
